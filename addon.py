@@ -1267,9 +1267,11 @@ def seaRes_serial(contId,chans):
                     genres+= g + ' | '
                 if genres !='':
                     genres= '[B]Gatunek: [/B]'+genres[:-3]
-            def episodeAppend(x,y,rd):
+            def episodeAppend(x,y,sNo=''):
                 for e in x: #x - lista odcinków (episodes/specials)
                     plot=''
+                    if sNo !='':
+                        plot+='[B]Sezon: [/B]'+str(sNo)+'\n'
                     if 'episode' in e:
                         plot+='[B]Odcinek: [/B]'+str(e['episode'])+'\n'
                     if 'synopsis' in e:
@@ -1297,11 +1299,14 @@ def seaRes_serial(contId,chans):
             if 'seasons' in resp:
                 for s in resp['seasons']:
                     if 'episodes' in s:
-                        episodeAppend(s['episodes'],eList,c[6])
+                        sNo=''
+                        if 'season' in s:
+                            sNo=s['season']
+                        episodeAppend(s['episodes'],eList,sNo)
             if 'episodes' in resp:
-                episodeAppend(resp['episodes'],eList,c[6])
+                episodeAppend(resp['episodes'],eList)
             if 'specials' in resp:
-                episodeAppend(resp['specials'],eList,c[6])
+                episodeAppend(resp['specials'],eList)
     for l in eList:
         title='[B]'+l[0]+'[/B]'
         dateBroadUTC=datetime.datetime(*(time.strptime(l[4], '%Y-%m-%dT%H:%M:%SZ')[0:7]))
