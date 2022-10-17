@@ -109,8 +109,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
                     'Referer':baseurl
                 }
                 manifest_data = requests.get(url_stream, headers=hea).content
-                print('MANIFEST')
-                print(manifest_data)
+                
                 self.send_response(200)
                 self.send_header('Content-type', 'application/xml+dash')
                 self.end_headers()
@@ -176,15 +175,13 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
             'ACCESSTOKEN':accessToken_refresh()#addon.getSetting('accessToken')
         }
         result = requests.post(url=path2, headers=hea, cookies=cookies, data=challenge)
-        print('REZULTAT_LIC')
+
         if result.status_code==200:
             self.send_response(200)
             self.end_headers()
             self.wfile.write(result.content)
 
         else:
-            #print(result)
-            #print(result.content)
             resp=result.content.decode('utf-8')
             if '\"statusCode\":1111' in resp: #niedostępne poza siecią UPC
                 xbmcgui.Dialog().notification('UPC', 'Kanał niedostępny poza siecią UPC.', xbmcgui.NOTIFICATION_INFO)

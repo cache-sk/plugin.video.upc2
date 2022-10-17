@@ -1,0 +1,4 @@
+v. 1.1 (2022-10-17)
+- info o usługach w pakiecie (Ustawienia)
+- kominikat o braku dostępności kanału TV poza siecią UPC (zmiana sposobu weryfikacji)
+- wyświetlanie sekcji Replay TV (symbole usług: 'replaytv', 'TVOD')

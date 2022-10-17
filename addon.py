@@ -174,7 +174,8 @@ def logIn():
                 'ACCESSTOKEN':accessToken_refresh()#addon.getSetting('accessToken')
             }
             resp=requests.get(url,headers=hea,cookies=cookies).json()
-            if 'replaytv' in resp['features']:
+            addon.setSetting('pakiet',str(resp['features']))
+            if 'replaytv' in resp['features'] or 'TVOD' in resp['features']:
                 addon.setSetting('isReplay','true')
             else:
                 addon.setSetting('isReplay','false')
@@ -387,10 +388,16 @@ def getStreamToken(cID):#
         'ACCESSTOKEN':accessToken_refresh()#addon.getSetting('accessToken')
     }
     resp=requests.post(url,headers=hea,cookies=cookies)
-    strTkn=resp.headers['x-streaming-token']
-    addon.setSetting('x_streaming_token',strTkn)
-    addon.setSetting('x_str_tkn_start',str(int(time.time())))
-    return strTkn, resp.json()['drmContentId']
+    respp=resp.content.decode('UTF-8')
+    if 'error' in respp: #2022-10-14
+        if '\"statusCode\":1111' in respp: #niedostępne poza siecią UPC
+            xbmcgui.Dialog().notification('UPC', 'Kanał niedostępny poza siecią UPC.', xbmcgui.NOTIFICATION_INFO)
+        return False
+    else:
+        strTkn=resp.headers['x-streaming-token']
+        addon.setSetting('x_streaming_token',strTkn)
+        addon.setSetting('x_str_tkn_start',str(int(time.time())))
+        return strTkn, resp.json()['drmContentId']
 
 def killStreamToken():
     tkn=addon.getSetting('x_streaming_token')
@@ -419,51 +426,55 @@ def playLiveTV(cid):
         if c[2]==cid:
             url_mpd=c[5]
             break
-    vxttoken,drmContentId = getStreamToken(cid)
-    url_mpd_tkn=url_mpd.replace('/manifest.mpd',';vxttoken='+vxttoken+'/manifest.mpd')
-
-    url_lic='https://prod.spark.upctv.pl/pol/web/session-manager/license?ContentId='+drmContentId
-    hea={
-        'User-Agent':UA,
-        'Referer':baseurl,
-        'deviceName':'Firefox',
-        'X-cus':addon.getSetting('x_cus'),
-        'x-drm-schemeId':schemeIdUri_gen(url_mpd_tkn),
-        'x-go-dev':addon.getSetting('x_go_dev'),
-        'X-OESP-Username':addon.getSetting('x_oesp_username'),
-        'X-Profile':addon.getSetting('x_profile'),
-        'x-streaming-token':vxttoken
-    }
-    addon.setSetting('hea_lic',str(hea))
-    hea_lic= '&'.join(['%s=%s' % (name, value) for (name, value) in hea.items()])
-
-    lickey=url_lic+'|'+hea_lic+'|R{SSM}|'
-
-    proxyport = addon.getSetting("proxyport")
-    proxy_lic='http://127.0.0.1:%s/licensetv='%(proxyport)
-    proxy_mpd='http://127.0.0.1:%s/MANIFEST='%(proxyport)
-
-    if addon.getSetting('proxy')=='true':
-        stream_url=proxy_mpd+url_mpd_tkn
+    stmtkn=getStreamToken(cid)
+    if stmtkn==False:
+        xbmcplugin.setResolvedUrl(addon_handle, False, xbmcgui.ListItem())
     else:
-        stream_url=url_mpd_tkn
-        print('BEZ_PROXY')
+        vxttoken,drmContentId = stmtkn
+        url_mpd_tkn=url_mpd.replace('/manifest.mpd',';vxttoken='+vxttoken+'/manifest.mpd')
 
-    import inputstreamhelper
-    PROTOCOL = 'mpd'
-    DRM = 'com.widevine.alpha'
-    is_helper = inputstreamhelper.Helper(PROTOCOL, drm=DRM)
-    if is_helper.check_inputstream():
-        play_item = xbmcgui.ListItem(path=stream_url)
-        play_item.setMimeType('application/xml+dash')
-        play_item.setContentLookup(False)
-        play_item.setProperty('inputstream', is_helper.inputstream_addon)
-        #play_item.setProperty("IsPlayable", "true")
-        play_item.setProperty('inputstream.adaptive.manifest_type', PROTOCOL)
-        play_item.setProperty("inputstream.adaptive.license_type", DRM)
-        play_item.setProperty("inputstream.adaptive.license_key", proxy_lic+lickey)
+        url_lic='https://prod.spark.upctv.pl/pol/web/session-manager/license?ContentId='+drmContentId
+        hea={
+            'User-Agent':UA,
+            'Referer':baseurl,
+            'deviceName':'Firefox',
+            'X-cus':addon.getSetting('x_cus'),
+            'x-drm-schemeId':schemeIdUri_gen(url_mpd_tkn),
+            'x-go-dev':addon.getSetting('x_go_dev'),
+            'X-OESP-Username':addon.getSetting('x_oesp_username'),
+            'X-Profile':addon.getSetting('x_profile'),
+            'x-streaming-token':vxttoken
+        }
+        addon.setSetting('hea_lic',str(hea))
+        hea_lic= '&'.join(['%s=%s' % (name, value) for (name, value) in hea.items()])
 
-    xbmcplugin.setResolvedUrl(addon_handle, True, listitem=play_item)
+        lickey=url_lic+'|'+hea_lic+'|R{SSM}|'
+
+        proxyport = addon.getSetting("proxyport")
+        proxy_lic='http://127.0.0.1:%s/licensetv='%(proxyport)
+        proxy_mpd='http://127.0.0.1:%s/MANIFEST='%(proxyport)
+
+        if addon.getSetting('proxy')=='true':
+            stream_url=proxy_mpd+url_mpd_tkn
+        else:
+            stream_url=url_mpd_tkn
+            print('BEZ_PROXY')
+
+        import inputstreamhelper
+        PROTOCOL = 'mpd'
+        DRM = 'com.widevine.alpha'
+        is_helper = inputstreamhelper.Helper(PROTOCOL, drm=DRM)
+        if is_helper.check_inputstream():
+            play_item = xbmcgui.ListItem(path=stream_url)
+            play_item.setMimeType('application/xml+dash')
+            play_item.setContentLookup(False)
+            play_item.setProperty('inputstream', is_helper.inputstream_addon)
+            #play_item.setProperty("IsPlayable", "true")
+            play_item.setProperty('inputstream.adaptive.manifest_type', PROTOCOL)
+            play_item.setProperty("inputstream.adaptive.license_type", DRM)
+            play_item.setProperty("inputstream.adaptive.license_key", proxy_lic+lickey)
+
+        xbmcplugin.setResolvedUrl(addon_handle, True, listitem=play_item)
 
 def calendar(cId,rd):
     repDur=int(int(rd)/(60*60*24))+1
@@ -692,7 +703,7 @@ def playReplayTV(prog_id,c):
             xbmcgui.Dialog().notification('UPC', 'Usługa niedostępna w twoim pakiecie.', xbmcgui.NOTIFICATION_INFO)
         elif 'has no entitlements for the replay' in resp.text: #program poza okresem replayTV TYMCZASOWO DO SPRAWDZENIA !!!!
             xbmcgui.Dialog().notification('UPC', 'Materiał nieobjęty ReplayTV (upływ okresu usługi).', xbmcgui.NOTIFICATION_INFO)
-        print(resp.text)
+        #print(resp.text)
         xbmcplugin.setResolvedUrl(addon_handle, False, xbmcgui.ListItem())
 
 def entitlementsToken():#
