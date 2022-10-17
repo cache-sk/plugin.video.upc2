@@ -9,6 +9,9 @@
 		<setting id="proxyReplay" type="bool" label='Odświeżanie tokena - ReplayTV' default="true"/>
 		<setting id="epg" type="bool" label='EPG' default="true"/>
 	</category>
+	<category label="Informacje dodatkowe">
+		<setting id="pakiet"  type="text" label="Usługi w pakiecie" default="" />
+	</category>
 	<category label="Others">
 		<setting label="Dev" type="lsep"/>
 		<setting label='status' type="" id="status" value="false" default=""/>
