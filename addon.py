@@ -36,8 +36,8 @@ def build_url(query):
     return base_url + '?' + urlencode(query)
 
 def home():
-    #addon.setSetting('proxy','false')#repo-only
-    #addon.setSetting('proxyReplay','true')#repo-only
+    addon.setSetting('proxy','false')
+    addon.setSetting('proxyReplay','true')
     status=addon.getSetting('status')
     if status=='loggedIn':
         items=[
