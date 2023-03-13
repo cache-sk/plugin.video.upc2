@@ -4,10 +4,8 @@
 		<setting type="lsep" label="Logowanie" />
 		<setting id="username"  type="text" label="Login" default="" />
 		<setting id="password"  type="text" label="Hasło" option="hidden"  default="" />
-		<setting id="pin"  type="text" label="PIN(UPC)" option="hidden"  default="" />
-		<setting id="proxy" type="bool" label='Odświeżanie tokena - LiveTV' default="false"/>
-		<setting id="proxyReplay" type="bool" label='Odświeżanie tokena - ReplayTV' default="true"/>
 		<setting id="epg" type="bool" label='EPG' default="true"/>
+		<setting id="directPlay" type="bool" label='Odtwarzanie bezpośrednio z listy' default="true"/>
 	</category>
 	<category label="Informacje dodatkowe">
 		<setting id="pakiet"  type="text" label="Usługi w pakiecie" default="" />

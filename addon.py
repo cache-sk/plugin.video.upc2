@@ -36,10 +36,13 @@ def build_url(query):
     return base_url + '?' + urlencode(query)
 
 def home():
+    #addon.setSetting('proxy','false')#repo-only
+    #addon.setSetting('proxyReplay','true')#repo-only
     status=addon.getSetting('status')
     if status=='loggedIn':
         items=[
             ['Telewizja','menu_tv'],
+            ['Radio','radio'],
             ['VOD','vod_categ'],
             ['Wyszukiwarka VOD','search_vod'],
             ['Wyloguj','logOut']
@@ -88,22 +91,35 @@ def code_gen(x):
     return code
 
 def accessToken_refresh(): #rozważyć w zamian funkcję weryfikującą odpowiedź zapytania -> accessToken_refresh() byłby stosowany w razie odpowiedzi 401
-    hea={
-        'User-Agent':UA,
-        'Referer':baseurl,
-    }
-    data={
-        'refreshToken':addon.getSetting('x_refresh_token'),
-        'username':addon.getSetting('x_oesp_username')
-    }
-    cookies={
-        'ACCESSTOKEN':addon.getSetting('accessToken')
-    }
-    url='https://prod.spark.upctv.pl/auth-service/v1/authorization/refresh'
-    resp=requests.post(url,headers=hea,cookies=cookies,json=data).json()
+    def accTknRefr():
+        hea={
+            'User-Agent':UA,
+            'Referer':baseurl,
+        }
+        data={
+            'refreshToken':addon.getSetting('x_refresh_token'),
+            'username':addon.getSetting('x_oesp_username')
+        }
+        cookies={
+            'ACCESSTOKEN':addon.getSetting('accessToken')
+        }
+        url='https://prod.spark.upctv.pl/auth-service/v1/authorization/refresh'
+        resp=requests.post(url,headers=hea,cookies=cookies,json=data).json()
+        return resp
+    
+    resp=accTknRefr()
     if 'error' in resp:
-        xbmcgui.Dialog().notification('UPC', 'Błąd: (Refresh AccTkn) '+resp['error']['message'] + ' Spróbuj jeszcze raz.', xbmcgui.NOTIFICATION_INFO)
-        xbmcplugin.setResolvedUrl(addon_handle, False, xbmcgui.ListItem())
+        logOut()
+        logIn()
+        print('refreshToken wygasł->PRZELOGOWANIE')
+        resp_new=accTknRefr()
+        if 'error' in resp_new:
+            xbmcgui.Dialog().notification('UPC', 'Błąd: (Refresh AccTkn) '+resp_new['error']['message'], xbmcgui.NOTIFICATION_INFO)
+            xbmcplugin.setResolvedUrl(addon_handle, False, xbmcgui.ListItem())
+        else:
+            addon.setSetting('accessToken',resp_new['accessToken'])
+            addon.setSetting('x_refresh_token',resp_new['refreshToken'])
+            return resp_new['accessToken']
     else:
         addon.setSetting('accessToken',resp['accessToken'])
         addon.setSetting('x_refresh_token',resp['refreshToken'])
@@ -137,7 +153,7 @@ def logIn():
                     xbmcgui.Dialog().notification('UPC', 'Dostęp zablokowany (np. z powodu braku płatności)', xbmcgui.NOTIFICATION_INFO)
                 else:
                     xbmcgui.Dialog().notification('UPC', 'Błąd: '+resp['error']['message'], xbmcgui.NOTIFICATION_INFO)
-                xbmcplugin.setResolvedUrl(addon_handle, False, xbmcgui.ListItem())
+
         else:
             addon.setSetting('status','loggedIn')
             addon.setSetting('x_cus',resp['householdId'])
@@ -154,11 +170,15 @@ def logIn():
                 'X-OESP-Username':addon.getSetting('x_oesp_username')
             }
             cookies={
-                'ACCESSTOKEN':accessToken_refresh()#addon.getSetting('accessToken')
+                'ACCESSTOKEN':addon.getSetting('accessToken')#accessToken_refresh()
             }
             resp1=requests.get(url1,headers=hea,cookies=cookies).json()
             addon.setSetting('cityId',str(resp1['cityId']))
-            addon.setSetting('x_profile',resp1['assignedDevices'][0]['defaultProfileId'])
+            if 'assignedDevices' in resp1:
+                addon.setSetting('x_profile',resp1['assignedDevices'][0]['defaultProfileId'])
+            else:
+                addon.setSetting('x_profile','anonymous')
+                xbmcgui.Dialog().notification('UPC', 'Brak usługi UPC TV GO w umowie', xbmcgui.NOTIFICATION_INFO)
 
             #weryfikacja usługi ReplayTV w pakiecie
             url='https://prod.spark.upctv.pl/pol/web/purchase-service/v2/customers/'+addon.getSetting('x_cus')+'/entitlements'
@@ -171,7 +191,7 @@ def logIn():
                 'X-Profile':addon.getSetting('x_profile')
             }
             cookies={
-                'ACCESSTOKEN':accessToken_refresh()#addon.getSetting('accessToken')
+                'ACCESSTOKEN':addon.getSetting('accessToken')#accessToken_refresh()
             }
             resp=requests.get(url,headers=hea,cookies=cookies).json()
             addon.setSetting('pakiet',str(resp['features']))
@@ -180,10 +200,8 @@ def logIn():
             else:
                 addon.setSetting('isReplay','false')
 
-            xbmcplugin.setResolvedUrl(addon_handle, False, xbmcgui.ListItem())
     else:
         xbmcgui.Dialog().notification('UPC', 'Podaj login i hasło w Ustawieniach', xbmcgui.NOTIFICATION_INFO)
-        xbmcplugin.setResolvedUrl(addon_handle, False, xbmcgui.ListItem())
 
 def channels_gen():#
     x_cus=addon.getSetting('x_cus')
@@ -317,7 +335,7 @@ def listTV(m):
             plot=''
             if epg!='' and c[2] in epg:
                 for e in epg[c[2]]:
-                   plot+='[B]'+e[0]+'-'+e[1]+'[/B] '+e[2]+'\n'
+                   plot+='[B]'+e[0]+'[/B]  '+e[2]+'\n'
 
             li=xbmcgui.ListItem(c[0])
             li.setProperty("IsPlayable", isPlayable)
@@ -394,10 +412,13 @@ def getStreamToken(cID):#
             xbmcgui.Dialog().notification('UPC', 'Kanał niedostępny poza siecią UPC.', xbmcgui.NOTIFICATION_INFO)
         return False
     else:
-        strTkn=resp.headers['x-streaming-token']
-        addon.setSetting('x_streaming_token',strTkn)
-        addon.setSetting('x_str_tkn_start',str(int(time.time())))
-        return strTkn, resp.json()['drmContentId']
+        if 'x-streaming-token' in resp.headers:#2022-11-25
+            strTkn=resp.headers['x-streaming-token']
+            addon.setSetting('x_streaming_token',strTkn)
+            addon.setSetting('x_str_tkn_start',str(int(time.time())))
+            return strTkn, resp.json()['drmContentId']
+        else:
+            return False#2022-11-25
 
 def killStreamToken():
     tkn=addon.getSetting('x_streaming_token')
@@ -552,32 +573,73 @@ def getEPG(d,c,rd): #d=yyyymmdd
 
     return epgData
 
-def replayEPG(cid,date,rd):
+def replayEPG(cid,date,rd):#2022-12-23
     epg_data=getEPG(date,cid,rd) #ts(timestamp),te(timestamp),title,progID
+    progIDs=[]
+    for ee in epg_data:
+        if ee[3] not in progIDs:
+            progIDs.append(ee[3])
+    imgs=getProgImg(progIDs)
     for e in epg_data:
+        if addon.getSetting('directPlay')=='true':
+            isPlayable='true'
+            isFolder=False
+            plot='Szczegóły dostępne z poziomu menu kontekstowego'
+            URL=build_url({'mode':'playReplayTV','progID':e[3],'contType':'replay'})
+        else:
+            isPlayable='false'
+            isFolder=True
+            plot=''
+            URL=build_url({'mode':'replayItem','progID':e[3]})
+        
         title='[B]'+datetime.datetime.fromtimestamp(e[0]).strftime('%H:%M')+'-'+datetime.datetime.fromtimestamp(e[1]).strftime('%H:%M')+'[/B] '+e[2]
+        img=img_tick
+        if e[3] in imgs:
+            img=imgs[e[3]]
         li=xbmcgui.ListItem(title)
-        li.setProperty("IsPlayable", 'false')
-        li.setInfo(type='video', infoLabels={'title': '','sorttitle': '','plot': ''})
-        li.setArt({'thumb': '', 'poster': '', 'banner': '', 'icon': img_tick, 'fanart':''})
-        url = build_url({'mode':'replayItem','progID':e[3]})
-        xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
+        li.setProperty("IsPlayable", isPlayable)
+        li.setInfo(type='video', infoLabels={'title': '','sorttitle': '','plot': plot})
+        li.setArt({'thumb': '', 'poster': '', 'banner': '', 'icon': img, 'fanart':''})#img_tick
+        
+        if addon.getSetting('directPlay')=='true':
+            contMenu = []
+            contMenu.append(('[B]Szczegóły[/B]','RunPlugin(plugin://plugin.video.upc2?mode=replayDetails&progID='+quote(e[3])+')'))
+            li.addContextMenuItems(contMenu, replaceItems=False)
+        
+        xbmcplugin.addDirectoryItem(handle=addon_handle, url=URL, listitem=li, isFolder=isFolder)
+    
+    if addon.getSetting('directPlay')=='true':
+        xbmcplugin.setContent(addon_handle, 'videos')
     xbmcplugin.endOfDirectory(addon_handle)
 
-def getProgImg(x):#
-    url='https://staticqbr-pl-prod.prod.cdn.dmdsdp.com/image-service/intent?jsonBody=[{"id":"'+x+'","intents":["posterTile"]}]'
-    hea={
-        'User-Agent':UA,
-        'Referer':baseurl
-    }
-    try:
-        resp=requests.get(url,headers=hea).json()
-        url_img=resp[0]['intents'][0]['url']
-    except:
-        url_img=''
-    return url_img
+def getProgImg(x):#2022-12-23
+    pict={}
+    k=0
+    for i in range(0,int(len(x)/8)+1):
+        jbody=[]
+        for k in range(0,8):
+            count=i*8+k
+            if count==len(x):
+                break
+            else:
+                cid=x[count]
+                jbody.append({"id":cid,"intents":['posterTile']})
+        #print(jbody[0])
+        u='https://staticqbr-pl-prod.prod.cdn.dmdsdp.com/image-service/intent'
+        params={
+            'jsonBody':json.dumps(jbody)
+        }
+        hea={
+            'User-Agent':UA,
+            'Referer':baseurl
+        }
+        resp_pic=requests.get(u,params=params,headers=hea).json()
+        #print(resp_pic)
+        for p in resp_pic:
+            pict[p['id']]=p['intents'][0]['url']
+    return pict
 
-def replayItem(prog_id):
+def repDet(prog_id):#2022-12-23
     url='https://prod.spark.upctv.pl/pol/web/linear-service/v2/replayEvent/'+prog_id+'?returnLinearContent=true&language=pl'
     hea={
         'User-Agent':UA,
@@ -607,14 +669,27 @@ def replayItem(prog_id):
         for g in resp['genres']:
             genres+=g+' | '
         plot+='[B]Gatunek: [/B]'+ genres[:-3]
-    img=getProgImg(prog_id)
+    return plot,resp['title']
+
+def replayDetails(prog_id):#2022-12-23
+    plot,title=repDet(prog_id)
+    if plot=='':
+        plot='Brak informacji'
+    dialog = xbmcgui.Dialog()
+    dialog.textviewer('Szczegóły', plot)
+
+def replayItem(prog_id):
+    plot,title=repDet(prog_id)
+    progIDs=[prog_id]
+    img=getProgImg(progIDs)[prog_id]
 
     li=xbmcgui.ListItem('..: Oglądaj :..')
     li.setProperty("IsPlayable", 'true')
-    li.setInfo(type='video', infoLabels={'title': resp['title'],'sorttitle': '','plot': plot})
+    li.setInfo(type='video', infoLabels={'title': title,'sorttitle': '','plot': plot})
     li.setArt({'thumb': img, 'poster': img, 'banner': img, 'icon': 'img_empty', 'fanart':img})
     url = build_url({'mode':'playReplayTV','progID':prog_id,'contType':'replay'})
     xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=False)
+    xbmcplugin.setContent(addon_handle, 'videos')
     xbmcplugin.endOfDirectory(addon_handle)
 
 def playReplayTV(prog_id,c):
@@ -846,9 +921,16 @@ def vod_items(contId,p):#lista Seriale/Filmy
                 else:
                     provider='nobrandingprovider'
                 title=r['title']
+                isPlayable='false'
+                isFolder=True
                 if r['type']=='ASSET':
                     contType=' [FILM]'
-                    Mode='vod_film'
+                    if addon.getSetting('directPlay')=='true':
+                        Mode='playDirectVOD'
+                        isPlayable='true'
+                        isFolder=False
+                    else:
+                        Mode='vod_film'
                 elif r['type']=='SERIES':
                     contType=' [SERIAL]'
                     Mode='vod_serial'
@@ -862,11 +944,15 @@ def vod_items(contId,p):#lista Seriale/Filmy
                     plot+='[B]Kat. wiekowa: [/B]'+str(r['ageRating'])+'\n'
 
                 li=xbmcgui.ListItem(title_plus)
-                li.setProperty("IsPlayable", 'false')
+                li.setProperty("IsPlayable", isPlayable)
                 li.setInfo(type='video', infoLabels={'title': title_plus,'sorttitle': '','plot': plot})
                 li.setArt({'thumb': '', 'poster': '', 'banner': '', 'icon': img, 'fanart':img})
+                if addon.getSetting('directPlay')=='true' and r['type']=='ASSET':
+                    contMenu = []
+                    contMenu.append(('[B]Szczegóły[/B]','RunPlugin(plugin://plugin.video.upc2?mode=vodDetails&contId='+quote(link)+'&prov='+quote(provider)+')'))
+                    li.addContextMenuItems(contMenu, replaceItems=False)
                 url = build_url({'mode':Mode,'contId':link,'prov':provider})
-                xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
+                xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=isFolder)
 
         if int(p)+count<totalCount:
             li=xbmcgui.ListItem('[I]>>> Następna strona[/I]')
@@ -875,10 +961,11 @@ def vod_items(contId,p):#lista Seriale/Filmy
             li.setArt({'thumb': '', 'poster': '', 'banner': '', 'icon': img_empty, 'fanart':''})
             url = build_url({'mode':'vod_items','contId':contId,'startCount':str(int(p)+count)})
             xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
-
+    if addon.getSetting('directPlay')=='true':
+        xbmcplugin.setContent(addon_handle, 'videos')
     xbmcplugin.endOfDirectory(addon_handle)
 
-def vod_film(contId,prov): #szczegóły filmu/odcinka serialu ---> odtwarzanie
+def vodDet(contId,prov):#2022-12-23
     x_profile=addon.getSetting('x_profile')
     cityId=addon.getSetting('cityId')
     url='https://prod.spark.upctv.pl/pol/web/vod-service/v2/detailscreen/'+contId+'?language=pl&profileId='+x_profile+'&maxRes=4K&cityId='+cityId+'&includeExternalProvider=ALL&brandingProviderId='+prov
@@ -924,6 +1011,22 @@ def vod_film(contId,prov): #szczegóły filmu/odcinka serialu ---> odtwarzanie
         img=pictures[resp['id']]
     else:
         img=img_tick
+        
+    return title,plot,img,link
+
+def playDirectVOD(contId,prov):#2022-12-23
+    title,plot,img,link=vodDet(contId,prov)
+    playReplayTV(link,'vod')
+    
+def vodDetails(contId,prov):#2022-12-23
+    title,plot,img,link=vodDet(contId,prov)
+    if plot=='':
+        plot='Brak informacji'
+    dialog = xbmcgui.Dialog()
+    dialog.textviewer('Szczegóły', plot)
+
+def vod_film(contId,prov): #szczegóły filmu/odcinka serialu ---> odtwarzanie
+    title,plot,img,link=vodDet(contId,prov)
 
     li=xbmcgui.ListItem('<<<OGLĄDAJ>>>')
     li.setProperty("IsPlayable", 'true')
@@ -931,7 +1034,7 @@ def vod_film(contId,prov): #szczegóły filmu/odcinka serialu ---> odtwarzanie
     li.setArt({'thumb': '', 'poster': '', 'banner': '', 'icon': img, 'fanart':img})
     url = build_url({'mode':'playReplayTV','progID':link,'contType':'vod'})
     xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=False)
-
+    xbmcplugin.setContent(addon_handle, 'videos')
     xbmcplugin.endOfDirectory(addon_handle)
 
 def vod_serial(contId): #lista sezonów
@@ -1008,12 +1111,25 @@ def vod_episodes(contId,s): #lista odcinków danego sezonu
                 H=int(e['source']['duration']/3600)
                 M=addZero(int((e['source']['duration']/3600-H)*60))
                 plot+='[B]Czas: [/B]'+str(H)+':'+M+'\n'
+        Mode='vod_film'
+        isFolder=True
+        isPlayable='false'
+        if addon.getSetting('directPlay')=='true':
+            Mode='playDirectVOD'
+            isFolder=False
+            isPlayable='true'
         li=xbmcgui.ListItem(title)
-        li.setProperty("IsPlayable", 'false')
+        li.setProperty("IsPlayable", isPlayable)
         li.setInfo(type='video', infoLabels={'title': title,'sorttitle': '','plot': plot})
         li.setArt({'thumb': '', 'poster': '', 'banner': '', 'icon': img, 'fanart':img})
-        url = build_url({'mode':'vod_film','contId':link,'prov':prov})
-        xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
+        url = build_url({'mode':Mode,'contId':link,'prov':prov})
+        if addon.getSetting('directPlay')=='true':
+            contMenu = []
+            contMenu.append(('[B]Szczegóły[/B]','RunPlugin(plugin://plugin.video.upc2?mode=vodDetails&contId='+quote(link)+'&prov='+quote(prov)+')'))
+            li.addContextMenuItems(contMenu, replaceItems=False)
+        xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=isFolder)
+    if addon.getSetting('directPlay')=='true':
+        xbmcplugin.setContent(addon_handle, 'videos')    
     xbmcplugin.endOfDirectory(addon_handle)
 
 def categTV():
@@ -1088,13 +1204,28 @@ def search_vod(q):
                         plot+='[B]Czas: [/B]'+str(H)+':'+M+'\n'
                     if 'ageRating' in r:
                         plot+='[B]Kat. wiekowa: [/B]'+str(r['ageRating'])+'\n'
-
+                    
+                    isPlayable='true'
+                    isFolder=False
+                    if addon.getSetting('directPlay')=='true':
+                        Mode='playDirectVOD'
+                        isPlayable='true'
+                        isFolder=False
+                    else:
+                        Mode='vod_film'
+                    
                     li=xbmcgui.ListItem(title)
-                    li.setProperty("IsPlayable", 'false')
+                    li.setProperty("IsPlayable", isPlayable)
                     li.setInfo(type='video', infoLabels={'title': title,'sorttitle': '','plot': plot})
                     li.setArt({'thumb': '', 'poster': '', 'banner': '', 'icon': img, 'fanart':img})
-                    url = build_url({'mode':'vod_film','contId':cid,'prov':'nobrandingprovider'})
-                    xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
+                    
+                    if addon.getSetting('directPlay')=='true':
+                        contMenu = []
+                        contMenu.append(('[B]Szczegóły[/B]','RunPlugin(plugin://plugin.video.upc2?mode=vodDetails&contId='+quote(cid)+'&prov=nobrandingprovider)'))
+                        li.addContextMenuItems(contMenu, replaceItems=False)
+                    
+                    url = build_url({'mode':Mode,'contId':cid,'prov':'nobrandingprovider'})
+                    xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=isFolder)
 
         elif 'seriesContentType' in r:
             if r['seriesContentType']=='VOD':
@@ -1119,7 +1250,9 @@ def search_vod(q):
                 li.setArt({'thumb': '', 'poster': '', 'banner': '', 'icon': img, 'fanart':img})
                 url = build_url({'mode':'vod_serial','contId':cid,'prov':'nobrandingprovider'})
                 xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
-
+    
+    if addon.getSetting('directPlay')=='true':
+        xbmcplugin.setContent(addon_handle, 'videos')
     xbmcplugin.endOfDirectory(addon_handle)
 
 def search_replayTV(q):
@@ -1218,13 +1351,31 @@ def search_replayTV(q):
                 dateBroadLocal=dateBroadUTC.replace(tzinfo=datetime.timezone.utc).astimezone(tz=None).strftime('%Y-%m-%d %H:%M')
                 if 'eventReplay' in r:
                     if int(time.time())<=r['eventReplay']['replayAvailabilityEnd'] and r['eventReplay']['isGoPlayable']==True:
+                        if addon.getSetting('directPlay')=='true':
+                            isPlayable='true'
+                            isFolder=False
+                            #plot='Szczegóły dostępne z poziomu menu kontekstowego'
+                            URL=build_url({'mode':'playReplayTV','progID':cid,'contType':'replay'})
+                        else:
+                            isPlayable='false'
+                            isFolder=True
+                            #plot=''
+                            URL=build_url({'mode':'replayItem','progID':cid})
+                        
                         li=xbmcgui.ListItem(title + ' | ' + dateBroadLocal + ' | ' + chanName)
-                        li.setProperty("IsPlayable", 'false')
+                        li.setProperty("IsPlayable", isPlayable)
                         li.setInfo(type='video', infoLabels={'title': title,'sorttitle': '','plot': plot})
                         li.setArt({'thumb': '', 'poster': '', 'banner': '', 'icon': img, 'fanart':img})
-                        url = build_url({'mode':'replayItem','progID':cid})
-                        xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
-
+                        
+                        if addon.getSetting('directPlay')=='true':
+                            contMenu = []
+                            contMenu.append(('[B]Szczegóły[/B]','RunPlugin(plugin://plugin.video.upc2?mode=replayDetails&progID='+quote(cid)+')'))
+                            li.addContextMenuItems(contMenu, replaceItems=False)
+                        
+                        xbmcplugin.addDirectoryItem(handle=addon_handle, url=URL, listitem=li, isFolder=isFolder)
+    
+    if addon.getSetting('directPlay')=='true':
+        xbmcplugin.setContent(addon_handle, 'videos')
     xbmcplugin.endOfDirectory(addon_handle)
 
 def chanCheck(x,y):
@@ -1324,12 +1475,30 @@ def seaRes_serial(contId,chans):
         dateBroadLocal=dateBroadUTC.replace(tzinfo=datetime.timezone.utc).astimezone(tz=None).strftime('%Y-%m-%d %H:%M')
         title+=' | '+dateBroadLocal + ' | ' + l[5]
         plot=l[2]+l[1]
+        
+        if addon.getSetting('directPlay')=='true':
+            isPlayable='true'
+            isFolder=False
+            URL=build_url({'mode':'playReplayTV','progID':l[3],'contType':'replay'})
+        else:
+            isPlayable='false'
+            isFolder=True
+            URL=build_url({'mode':'replayItem','progID':l[3]})
+        
         li=xbmcgui.ListItem(title)
-        li.setProperty("IsPlayable", 'false')
+        li.setProperty("IsPlayable", isPlayable)
         li.setInfo(type='video', infoLabels={'title': '','sorttitle': '','plot': plot})
         li.setArt({'thumb': '', 'poster': '', 'banner': '', 'icon': img_tick, 'fanart':''})
-        url = build_url({'mode':'replayItem','progID':l[3]})
-        xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
+        
+        if addon.getSetting('directPlay')=='true':
+            contMenu = []
+            contMenu.append(('[B]Szczegóły[/B]','RunPlugin(plugin://plugin.video.upc2?mode=replayDetails&progID='+quote(l[3])+')'))
+            li.addContextMenuItems(contMenu, replaceItems=False)
+        
+        xbmcplugin.addDirectoryItem(handle=addon_handle, url=URL, listitem=li, isFolder=isFolder)
+    
+    if addon.getSetting('directPlay')=='true':
+        xbmcplugin.setContent(addon_handle, 'videos')
     xbmcplugin.endOfDirectory(addon_handle)
 
 def seaRes_film(contId,tit):
@@ -1376,14 +1545,108 @@ def seaRes_film(contId,tit):
             dateBroadUTC=datetime.datetime(*(time.strptime(l[2], '%Y-%m-%dT%H:%M:%SZ')[0:7]))
             dateBroadLocal=dateBroadUTC.replace(tzinfo=datetime.timezone.utc).astimezone(tz=None).strftime('%Y-%m-%d %H:%M')
             title+=' | '+dateBroadLocal + ' | ' + l[3]
+            
+            if addon.getSetting('directPlay')=='true':
+                isPlayable='true'
+                isFolder=False
+                URL=build_url({'mode':'playReplayTV','progID':l[1],'contType':'replay'})
+            else:
+                isPlayable='false'
+                isFolder=True
+                URL=build_url({'mode':'replayItem','progID':l[1]})
+            
             li=xbmcgui.ListItem(title)
-            li.setProperty("IsPlayable", 'false')
+            li.setProperty("IsPlayable", isPlayable)
             li.setInfo(type='video', infoLabels={'title': '','sorttitle': '','plot': ''})
             li.setArt({'thumb': '', 'poster': '', 'banner': '', 'icon': img_tick, 'fanart':''})
-            url = build_url({'mode':'replayItem','progID':l[1]})
-            xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=True)
+            
+            if addon.getSetting('directPlay')=='true':
+                contMenu = []
+                contMenu.append(('[B]Szczegóły[/B]','RunPlugin(plugin://plugin.video.upc2?mode=replayDetails&progID='+quote(l[1])+')'))
+                li.addContextMenuItems(contMenu, replaceItems=False)
+            
+            xbmcplugin.addDirectoryItem(handle=addon_handle, url=URL, listitem=li, isFolder=isFolder)
 
+    if addon.getSetting('directPlay')=='true':
+        xbmcplugin.setContent(addon_handle, 'videos')
     xbmcplugin.endOfDirectory(addon_handle)
+
+def radio():#2022-12-28
+    x_cus=addon.getSetting('x_cus')
+    x_go_dev=addon.getSetting('x_go_dev')
+    x_oesp_username=addon.getSetting('x_oesp_username')
+    x_profile=addon.getSetting('x_profile')
+
+    #lista kanałów
+    cityId=addon.getSetting('cityId')
+    url='https://prod.spark.upctv.pl/pol/web/linear-service/v2/channels?cityId='+cityId+'&language=pl&productClass=Orion-DASH'
+    hea={
+        'User-Agent':UA,
+        'Referer':baseurl,
+        'x-go-dev':x_go_dev,
+        'X-OESP-Username':x_oesp_username,
+        'X-Profile':x_profile
+    }
+    cookies={
+        'ACCESSTOKEN':accessToken_refresh()#addon.getSetting('accessToken')
+    }
+    resp=requests.get(url,headers=hea,cookies=cookies).json()
+    channels=[]
+    for r in resp:
+        if r['logicalChannelNumber']>=950:
+            name=r['name']
+            lcn=r['logicalChannelNumber']
+            cid=r['id']
+            logo=r['logo']['focused']
+            channels.append([name,lcn,cid,logo])
+    epg=''
+    if addon.getSetting('epg')=='true':
+        epg=getSchedule()
+    for c in channels:
+        plot=''
+        if epg!='' and c[2] in epg:
+            for e in epg[c[2]]:
+                plot+='[B]'+e[0]+'[/B]  '+e[2]+'\n'
+
+        li=xbmcgui.ListItem(c[0])
+        li.setProperty("IsPlayable", 'true')
+        li.setInfo(type='video', infoLabels={'title': c[0],'sorttitle': c[0],'plot': plot})
+        li.setArt({'thumb': c[3], 'poster': c[3], 'banner': c[3], 'icon': c[3], 'fanart':c[3]})
+        url = build_url({'mode':'radioPlay','chID':c[2]})
+        xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=False)
+    xbmcplugin.endOfDirectory(addon_handle)
+    xbmcplugin.addSortMethod(handle=addon_handle,sortMethod=xbmcplugin.SORT_METHOD_TITLE)
+
+def radioPlay(cid):
+    strims={
+        'Polskie_Radio_Jedynka':'http://mp3.polskieradio.pl:8810/pr1_mp3',
+        'Polskie_Radio_Dwojka':'http://mp3.polskieradio.pl:8812/pr2_mp3',
+        'Polskie_Radio_Trojka':'http://mp3.polskieradio.pl:8814/pr3_mp3',
+        'Polskie_Radio_Czworka':'http://mp3.polskieradio.pl:8826/pr24_mp3',
+        'RMF_FM':'http://rmfstream9.interia.pl:8000/rmf_fm',
+        'RMF_Classic':'http://rmfstream9.interia.pl:8000/rmf_classic',
+        'RMF_Maxxx':'http://rmfstream9.interia.pl:8000/rmf_maxxx',
+        'Radio_ZET':'http://zt01.cdn.eurozet.pl/zet-net.mp3',
+        'Antyradio':'http://ant.cdn.eurozet.pl/ant-waw.mp3',
+        'Radio_ZET_Chilli':'http://chi.cdn.eurozet.pl/chi-net.mp3',
+        'Muzo_fm':'http://n16a-eu.rcs.revma.com:80/1nnezw8qz7zuv',
+        'TOK_FM':'http://radiostream.pl/tuba10-1.mp3',
+        'Radio_ZET_Gold':'http://ml.cdn.eurozet.pl/mel-net.mp3',
+        'VOX_FM':'http://ic1.smcdn.pl/3990-1.mp3',
+        'ESKA_Rock':'http://ic1.smcdn.pl/5380-1.mp3',
+        'KOLOR_103_FM':'http://n03.radiojar.com:80/xt0cf1v8938uv',
+        'Radio_Zlote_Przeboje':'http://radiostream.pl/tuba8936-1.mp3',
+        'Radio_ESKA':'http://ic1.smcdn.pl/2380-1.mp3',
+        'Radio_Wawa':'http://ic1.smcdn.pl/1380-1.mp3'   
+    }
+    if cid in strims:
+        stream_url=strims[cid]
+        play_item = xbmcgui.ListItem(path=stream_url)
+        play_item.setProperty("IsPlayable", "true")
+        xbmcplugin.setResolvedUrl(addon_handle, True, listitem=play_item)
+    else:
+        xbmcgui.Dialog().notification('UPC GO', 'Brak źródła.', xbmcgui.NOTIFICATION_INFO)
+        xbmcplugin.setResolvedUrl(addon_handle, False, xbmcgui.ListItem())
 
 def logOut():
     hea={
@@ -1436,6 +1699,7 @@ if not mode:
 else:
     if mode=='logIn':
         logIn()
+        xbmcplugin.setResolvedUrl(addon_handle, False, xbmcgui.ListItem())
         if addon.getSetting('status')=='loggedIn':
             xbmc.executebuiltin('Container.Refresh()')
 
@@ -1471,6 +1735,10 @@ else:
     if mode=='replayItem':
         prog_id=params.get('progID')
         replayItem(prog_id)
+        
+    if mode=='replayDetails':#2022-12-23
+        prog_id=params.get('progID')
+        replayDetails(prog_id)
 
     if mode=='playReplayTV':
         prog_id=params.get('progID')
@@ -1488,7 +1756,17 @@ else:
         contId=params.get('contId')
         p=params.get('startCount')
         vod_items(contId,p)
-
+        
+    if mode=='playDirectVOD':#2022-12-23
+        contId=params.get('contId')
+        prov=params.get('prov')
+        playDirectVOD(contId,prov)
+    
+    if mode=='vodDetails':#2022-12-23
+        contId=params.get('contId')
+        prov=params.get('prov')
+        vodDetails(contId,prov)
+        
     if mode=='vod_film':
         contId=params.get('contId')
         prov=params.get('prov')
@@ -1543,3 +1821,10 @@ else:
             generate_m3u()
         else:
             xbmcgui.Dialog().notification('UPC', 'Akcja wymaga zalogowania.', xbmcgui.NOTIFICATION_INFO)
+    
+    if mode=='radio':#2022-12-28
+        radio()
+        
+    if mode=='radioPlay':#2022-12-28
+        c=params.get('chID')
+        radioPlay(c)
