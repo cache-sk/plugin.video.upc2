@@ -30,13 +30,13 @@ path_m3u = addon.getSetting('path_m3u')
 
 mode = addon.getSetting('mode')
 baseurl='https://www.upctv.pl/'
-UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:101.0) Gecko/20100101 Firefox/101.0'
+UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/113.0'
 
 def build_url(query):
     return base_url + '?' + urlencode(query)
 
 def home():
-    addon.setSetting('proxy','false')
+    addon.setSetting('proxy','true')
     addon.setSetting('proxyReplay','true')
     status=addon.getSetting('status')
     if status=='loggedIn':
@@ -491,6 +491,8 @@ def playLiveTV(cid):
             play_item.setContentLookup(False)
             play_item.setProperty('inputstream', is_helper.inputstream_addon)
             #play_item.setProperty("IsPlayable", "true")
+            play_item.setProperty('inputstream.adaptive.stream_headers', 'User-Agent='+UA)
+            play_item.setProperty('inputstream.adaptive.manifest_headers', 'User-Agent='+UA)
             play_item.setProperty('inputstream.adaptive.manifest_type', PROTOCOL)
             play_item.setProperty("inputstream.adaptive.license_type", DRM)
             play_item.setProperty("inputstream.adaptive.license_key", proxy_lic+lickey)
