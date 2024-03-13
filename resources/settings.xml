@@ -34,7 +34,7 @@
         <setting label="Nazwa" type="text" id="fname" default="iptv.m3u"/>
         <setting label="Katalog" type="folder" id="path_m3u" source="auto" option="writeable"/>
         <setting type="action"
-				action="RunPlugin(plugin://plugin.video.upc2?mode=BUILD_M3U)"
+				action="RunPlugin(plugin://plugin.video.upctvsk?mode=BUILD_M3U)"
                 label="Utwórz listę m3u"
                 option="close"/>
 	</category>

@@ -21,7 +21,7 @@ from urllib.parse import urlencode, quote_plus, quote, unquote, parse_qsl
 base_url = sys.argv[0]
 addon_handle = int(sys.argv[1])
 params = dict(parse_qsl(sys.argv[2][1:]))
-addon = xbmcaddon.Addon(id='plugin.video.upc2')
+addon = xbmcaddon.Addon(id='plugin.video.upctvsk')
 PATH=addon.getAddonInfo('path')
 img_empty=PATH+'/resources/empty.png'
 img_tick=PATH+'/resources/tick.png'
@@ -611,7 +611,7 @@ def replayEPG(cid,date,rd):#2022-12-23
         
         if addon.getSetting('directPlay')=='true':
             contMenu = []
-            contMenu.append(('[B]Szczegóły[/B]','RunPlugin(plugin://plugin.video.upc2?mode=replayDetails&progID='+quote(e[3])+')'))
+            contMenu.append(('[B]Szczegóły[/B]','RunPlugin(plugin://plugin.video.upctvsk?mode=replayDetails&progID='+quote(e[3])+')'))
             li.addContextMenuItems(contMenu, replaceItems=False)
         
         xbmcplugin.addDirectoryItem(handle=addon_handle, url=URL, listitem=li, isFolder=isFolder)
@@ -959,7 +959,7 @@ def vod_items(contId,p):#lista Seriale/Filmy
                 li.setArt({'thumb': '', 'poster': '', 'banner': '', 'icon': img, 'fanart':img})
                 if addon.getSetting('directPlay')=='true' and r['type']=='ASSET':
                     contMenu = []
-                    contMenu.append(('[B]Szczegóły[/B]','RunPlugin(plugin://plugin.video.upc2?mode=vodDetails&contId='+quote(link)+'&prov='+quote(provider)+')'))
+                    contMenu.append(('[B]Szczegóły[/B]','RunPlugin(plugin://plugin.video.upctvsk?mode=vodDetails&contId='+quote(link)+'&prov='+quote(provider)+')'))
                     li.addContextMenuItems(contMenu, replaceItems=False)
                 url = build_url({'mode':Mode,'contId':link,'prov':provider})
                 xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=isFolder)
@@ -1135,7 +1135,7 @@ def vod_episodes(contId,s): #lista odcinków danego sezonu
         url = build_url({'mode':Mode,'contId':link,'prov':prov})
         if addon.getSetting('directPlay')=='true':
             contMenu = []
-            contMenu.append(('[B]Szczegóły[/B]','RunPlugin(plugin://plugin.video.upc2?mode=vodDetails&contId='+quote(link)+'&prov='+quote(prov)+')'))
+            contMenu.append(('[B]Szczegóły[/B]','RunPlugin(plugin://plugin.video.upctvsk?mode=vodDetails&contId='+quote(link)+'&prov='+quote(prov)+')'))
             li.addContextMenuItems(contMenu, replaceItems=False)
         xbmcplugin.addDirectoryItem(handle=addon_handle, url=url, listitem=li, isFolder=isFolder)
     if addon.getSetting('directPlay')=='true':
@@ -1231,7 +1231,7 @@ def search_vod(q):
                     
                     if addon.getSetting('directPlay')=='true':
                         contMenu = []
-                        contMenu.append(('[B]Szczegóły[/B]','RunPlugin(plugin://plugin.video.upc2?mode=vodDetails&contId='+quote(cid)+'&prov=nobrandingprovider)'))
+                        contMenu.append(('[B]Szczegóły[/B]','RunPlugin(plugin://plugin.video.upctvsk?mode=vodDetails&contId='+quote(cid)+'&prov=nobrandingprovider)'))
                         li.addContextMenuItems(contMenu, replaceItems=False)
                     
                     url = build_url({'mode':Mode,'contId':cid,'prov':'nobrandingprovider'})
@@ -1381,7 +1381,7 @@ def search_replayTV(q):
                         
                         if addon.getSetting('directPlay')=='true':
                             contMenu = []
-                            contMenu.append(('[B]Szczegóły[/B]','RunPlugin(plugin://plugin.video.upc2?mode=replayDetails&progID='+quote(cid)+')'))
+                            contMenu.append(('[B]Szczegóły[/B]','RunPlugin(plugin://plugin.video.upctvsk?mode=replayDetails&progID='+quote(cid)+')'))
                             li.addContextMenuItems(contMenu, replaceItems=False)
                         
                         xbmcplugin.addDirectoryItem(handle=addon_handle, url=URL, listitem=li, isFolder=isFolder)
@@ -1504,7 +1504,7 @@ def seaRes_serial(contId,chans):
         
         if addon.getSetting('directPlay')=='true':
             contMenu = []
-            contMenu.append(('[B]Szczegóły[/B]','RunPlugin(plugin://plugin.video.upc2?mode=replayDetails&progID='+quote(l[3])+')'))
+            contMenu.append(('[B]Szczegóły[/B]','RunPlugin(plugin://plugin.video.upctvsk?mode=replayDetails&progID='+quote(l[3])+')'))
             li.addContextMenuItems(contMenu, replaceItems=False)
         
         xbmcplugin.addDirectoryItem(handle=addon_handle, url=URL, listitem=li, isFolder=isFolder)
@@ -1574,7 +1574,7 @@ def seaRes_film(contId,tit):
             
             if addon.getSetting('directPlay')=='true':
                 contMenu = []
-                contMenu.append(('[B]Szczegóły[/B]','RunPlugin(plugin://plugin.video.upc2?mode=replayDetails&progID='+quote(l[1])+')'))
+                contMenu.append(('[B]Szczegóły[/B]','RunPlugin(plugin://plugin.video.upctvsk?mode=replayDetails&progID='+quote(l[1])+')'))
                 li.addContextMenuItems(contMenu, replaceItems=False)
             
             xbmcplugin.addDirectoryItem(handle=addon_handle, url=URL, listitem=li, isFolder=isFolder)
@@ -1697,7 +1697,7 @@ def generate_m3u():#
         channelID = c[2]
         channelName = c[0]
         channelLogo = c[3]
-        data += '#EXTINF:0 tvg-id="%s" tvg-logo="%s",%s\nplugin://plugin.video.upc2/?mode=playChanList&cid=%s\n' % (channelName,channelLogo,channelName,channelID)#zmiana z amp;
+        data += '#EXTINF:0 tvg-id="%s" tvg-logo="%s",%s\nplugin://plugin.video.upctvsk/?mode=playChanList&cid=%s\n' % (channelName,channelLogo,channelName,channelID)#zmiana z amp;
 
     f = xbmcvfs.File(path_m3u + file_name, 'w')
     f.write(data)

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
-<addon id="plugin.video.upc2" name="upc2" version="1.5" provider-name="lg">
+<addon id="plugin.video.upctvsk" name="UPC TV SK" version="1.6" provider-name="cache, lg">
     <requires>
         <import addon="script.module.requests" />
         <import addon="script.module.inputstreamhelper" />
@@ -11,17 +11,15 @@
     </extension>
  	<extension point="xbmc.service" library="serverHTTP.py" />
 	<extension point="xbmc.addon.metadata">
-        <description lang="pl">UPC GO</description>
-        <disclaimer lang="pl">UPC GO
-        </disclaimer>
-        <summary lang="en">UPC GO</summary>
-        <description lang="en">UPC GO</description>
-        <disclaimer lang="en">UPC GO
-        </disclaimer>
-        <language>pl</language>
+        <description lang="sk">UPC TV SK</description>
+        <disclaimer lang="sk">UPC TV SK</disclaimer>
+        <summary lang="en">UPC TV SK</summary>
+        <description lang="en">UPC TV SK</description>
+        <disclaimer lang="en">UPC TV SK</disclaimer>
+        <language>sk</language>
         <platform>all</platform>
         <license>GNU GENERAL PUBLIC LICENSE. Version 2, June 1991</license>
-        <website>https://www.upctv.pl/</website>
+        <website>https://www.upctv.sk/</website>
         <assets>
             <icon>icon.png</icon>
         </assets>

@@ -9,7 +9,7 @@ from contextlib import closing
 import time
 
 import xbmcaddon, xbmcgui
-addon = xbmcaddon.Addon(id='plugin.video.upc2')
+addon = xbmcaddon.Addon(id='plugin.video.upctvsk')
 import requests
 import sys
 
