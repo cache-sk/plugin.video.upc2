@@ -29,7 +29,7 @@ file_name = addon.getSetting('fname')
 path_m3u = addon.getSetting('path_m3u')
 
 mode = addon.getSetting('mode')
-baseurl='https://www.upctv.pl/'
+baseurl='https://www.upctv.sk/'
 UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/113.0'
 
 def build_url(query):
@@ -42,9 +42,9 @@ def home():
     if status=='loggedIn':
         items=[
             ['Telewizja','menu_tv'],
-            ['Radio','radio'],
-            ['VOD','vod_categ'],
-            ['Wyszukiwarka VOD','search_vod'],
+            #['Radio','radio'],
+            #['VOD','vod_categ'],
+            #['Wyszukiwarka VOD','search_vod'],
             ['Wyloguj','logOut']
         ]
     else:
@@ -103,7 +103,7 @@ def accessToken_refresh(): #rozważyć w zamian funkcję weryfikującą odpowied
         cookies={
             'ACCESSTOKEN':addon.getSetting('accessToken')
         }
-        url='https://prod.spark.upctv.pl/auth-service/v1/authorization/refresh'
+        url='https://spark-prod-sk.gnp.cloud.upctv.sk/auth-service/v1/authorization/refresh'
         resp=requests.post(url,headers=hea,cookies=cookies,json=data).json()
         return resp
     
@@ -142,7 +142,7 @@ def logIn():
             #"stayLoggedIn": False,
             "username": addon.getSetting('username')
         }
-        url='https://prod.spark.upctv.pl/auth-service/v1/authorization'
+        url='https://spark-prod-sk.gnp.cloud.upctv.sk/auth-service/v1/authorization'
         resp=requests.post(url,headers=hea,json=data).json()
         if 'username' not in resp:
             if 'error' in resp:
@@ -161,7 +161,7 @@ def logIn():
             addon.setSetting('x_refresh_token',resp['refreshToken'])
             addon.setSetting('accessToken',resp['accessToken'])
 
-            url1='https://prod.spark.upctv.pl/pol/web/personalization-service/v1/customer/'+addon.getSetting('x_cus')+'?with=profiles,devices'
+            url1='https://spark-prod-sk.gnp.cloud.upctv.sk/slk/web/personalization-service/v1/customer/'+addon.getSetting('x_cus')+'?with=profiles,devices'
             hea={
                 'User-Agent':UA,
                 'Referer':baseurl,
@@ -174,14 +174,17 @@ def logIn():
             }
             resp1=requests.get(url1,headers=hea,cookies=cookies).json()
             addon.setSetting('cityId',str(resp1['cityId']))
-            if 'assignedDevices' in resp1:
-                addon.setSetting('x_profile',resp1['assignedDevices'][0]['defaultProfileId'])
+            #if 'assignedDevices' in resp1:
+            #    addon.setSetting('x_profile',resp1['assignedDevices'][0]['defaultProfileId'])
+            #SK - is this ok?
+            if 'profiles' in resp1:
+                addon.setSetting('x_profile',resp1['profiles'][0]['profileId'])
             else:
                 addon.setSetting('x_profile','anonymous')
                 xbmcgui.Dialog().notification('UPC', 'Brak usługi UPC TV GO w umowie', xbmcgui.NOTIFICATION_INFO)
 
             #weryfikacja usługi ReplayTV w pakiecie
-            url='https://prod.spark.upctv.pl/pol/web/purchase-service/v2/customers/'+addon.getSetting('x_cus')+'/entitlements'
+            url='https://spark-prod-sk.gnp.cloud.upctv.sk/slk/web/purchase-service/v2/customers/'+addon.getSetting('x_cus')+'/entitlements'
             hea={
                 'User-Agent':UA,
                 'Referer':baseurl,
@@ -210,7 +213,7 @@ def channels_gen():#
     x_profile=addon.getSetting('x_profile')
 
     #pakiety
-    url='https://prod.spark.upctv.pl/pol/web/purchase-service/v2/customers/'+x_cus+'/entitlements'
+    url='https://spark-prod-sk.gnp.cloud.upctv.sk/slk/web/purchase-service/v2/customers/'+x_cus+'/entitlements'
     hea={
         'User-Agent':UA,
         'Referer':baseurl,
@@ -238,7 +241,7 @@ def channels_gen():#
 
     #lista kanałów
     cityId=addon.getSetting('cityId')
-    url='https://prod.spark.upctv.pl/pol/web/linear-service/v2/channels?cityId='+cityId+'&language=pl&productClass=Orion-DASH'
+    url='https://spark-prod-sk.gnp.cloud.upctv.sk/slk/web/linear-service/v2/channels?cityId='+cityId+'&language=pl&productClass=Orion-DASH'
     hea={
         'User-Agent':UA,
         'Referer':baseurl,
@@ -282,7 +285,7 @@ def getSchedule(): #EPG
     epgData={}#
     i=1
     while i<=5:
-        url='https://static.spark.upctv.pl/pol/web/epg-service-lite/pl/pl/events/segments/'+ymd+addZero(partDay)+'0000'
+        url='https://staticqbr-prod-sk.gnp.cloud.upctv.sk/slk/web/epg-service-lite/sk/sk/events/segments/'+ymd+addZero(partDay)+'0000'
         hea={
             'User-Agent':UA,
             'Referer':baseurl
@@ -355,7 +358,7 @@ def addZero(x): #
 def urlEPG(t): #url do EPG dla timestamp (podział wg czasu GMT!!!)
     d=time.gmtime(t)
     date=str(d[0])+addZero(d[1])+addZero(d[2])
-    return 'https://static.spark.upctv.pl/pol/web/epg-service-lite/pl/pl/events/segments/'+date+addZero(6*int(d[3]/6))+'0000'
+    return 'https://staticqbr-prod-sk.gnp.cloud.upctv.sk/slk/web/epg-service-lite/sk/sk/events/segments/'+date+addZero(6*int(d[3]/6))+'0000'
 
 def getCrid(chID):#ID event (programu/audycji)
     now=int(time.time())
@@ -380,7 +383,8 @@ def schemeIdUri_gen(u):#
     }
     resp=requests.get(u,headers=hea).text
     try:
-        uuid=re.compile('schemeIdUri=\"urn:uuid:([^\"]+?)\">').findall(resp)[0]
+        #uuid=re.compile('schemeIdUri=\"urn:uuid:([^\"]+?)\">').findall(resp)[0]
+        uuid=re.compile('schemeIdUri=\"urn:uuid:([^\"]+?)\"[^>]+Widevine[^>]+>').findall(resp)[0]
     except:
         uuid=re.compile('schemeIdUri=\"urn:uuid:([^\"]+?)\" cenc:').findall(resp)[0]
     return uuid
@@ -391,7 +395,7 @@ def getStreamToken(cID):#
     x_cus=addon.getSetting('x_cus')
     x_profile=addon.getSetting('x_profile')
     crid=getCrid(cID)
-    url='https://prod.spark.upctv.pl/pol/web/session-service/session/v2/web-desktop/customers/'+x_cus+'/live?channelId='+cID+'&eventId='+crid+'&assetType=Orion-DASH&profileId='+x_profile
+    url='https://spark-prod-sk.gnp.cloud.upctv.sk/slk/web/session-service/session/v2/web-desktop/customers/'+x_cus+'/live?channelId='+cID+'&eventId='+crid+'&assetType=Orion-DASH&profileId='+x_profile
     hea={
         'User-Agent':UA,
         'Referer':baseurl,
@@ -422,7 +426,7 @@ def getStreamToken(cID):#
 
 def killStreamToken():
     tkn=addon.getSetting('x_streaming_token')
-    url='https://prod.spark.upctv.pl/pol/web/session-manager/license/token'
+    url='https://spark-prod-sk.gnp.cloud.upctv.sk/slk/web/session-manager/license/token'
     hea={
         'User-Agent':UA,
         'Referer':baseurl,
@@ -443,6 +447,7 @@ def playLiveTV(cid):
     addon.setSetting('streamType','livetv')
     chns=eval(addon.getSetting('channels'))
     url_mpd='' #"http://wp1-obc12-live-pl-prod.prod.cdn.dmdsdp.com/dash/AXN_HD/manifest.mpd"
+    #http://wp1-g-anp11120000-live-sk-prod.prod.cdn.dmdsdp.com/live/disk1/Jednotka_HD/go-dash-fhd-avc/Jednotka_HD.mpd
     for c in chns:
         if c[2]==cid:
             url_mpd=c[5]
@@ -452,9 +457,10 @@ def playLiveTV(cid):
         xbmcplugin.setResolvedUrl(addon_handle, False, xbmcgui.ListItem())
     else:
         vxttoken,drmContentId = stmtkn
-        url_mpd_tkn=url_mpd.replace('/manifest.mpd',';vxttoken='+vxttoken+'/manifest.mpd')
+        #url_mpd_tkn=url_mpd.replace('/manifest.mpd',';vxttoken='+vxttoken+'/manifest.mpd')
+        url_mpd_tkn=url_mpd.replace('/disk1/',';vxttoken='+vxttoken+'/disk1/')
 
-        url_lic='https://prod.spark.upctv.pl/pol/web/session-manager/license?ContentId='+drmContentId
+        url_lic='https://spark-prod-sk.gnp.cloud.upctv.sk/slk/web/session-manager/license?ContentId='+drmContentId
         hea={
             'User-Agent':UA,
             'Referer':baseurl,
@@ -536,7 +542,7 @@ def getEPG(d,c,rd): #d=yyyymmdd
     epgData=[]
     i=1
     while i<=5:
-        url='https://static.spark.upctv.pl/pol/web/epg-service-lite/pl/pl/events/segments/'+ymd+addZero(partDay)+'0000'
+        url='https://staticqbr-prod-sk.gnp.cloud.upctv.sk/slk/web/epg-service-lite/sk/sk/events/segments/'+ymd+addZero(partDay)+'0000'
         hea={
             'User-Agent':UA,
             'Referer':baseurl
@@ -627,7 +633,7 @@ def getProgImg(x):#2022-12-23
                 cid=x[count]
                 jbody.append({"id":cid,"intents":['posterTile']})
         #print(jbody[0])
-        u='https://staticqbr-pl-prod.prod.cdn.dmdsdp.com/image-service/intent'
+        u='https://staticqbr-prod-sk.gnp.cloud.upctv.sk/image-service/intent'
         params={
             'jsonBody':json.dumps(jbody)
         }
@@ -642,7 +648,7 @@ def getProgImg(x):#2022-12-23
     return pict
 
 def repDet(prog_id):#2022-12-23
-    url='https://prod.spark.upctv.pl/pol/web/linear-service/v2/replayEvent/'+prog_id+'?returnLinearContent=true&language=pl'
+    url='https://spark-prod-sk.gnp.cloud.upctv.sk/slk/web/linear-service/v2/replayEvent/'+prog_id+'?returnLinearContent=true&language=pl'
     hea={
         'User-Agent':UA,
         'Referer':baseurl,
@@ -702,7 +708,7 @@ def playReplayTV(prog_id,c):
     addon.setSetting('streamType','replaytv')
     if addon.getSetting('x_streaming_token')!='': #wyrejestrowanie ostatnio użytego tokena (x-streaming-token)
         killStreamToken()
-    url='https://prod.spark.upctv.pl/pol/web/session-service/session/v2/web-desktop/customers/'+addon.getSetting('x_cus')+'/'+cnt+prog_id+'&abrType=BR-AVC-DASH&profileId='+addon.getSetting('x_profile')
+    url='https://spark-prod-sk.gnp.cloud.upctv.sk/slk/web/session-service/session/v2/web-desktop/customers/'+addon.getSetting('x_cus')+'/'+cnt+prog_id+'&abrType=BR-AVC-DASH&profileId='+addon.getSetting('x_profile')
     hea={
         'User-Agent':UA,
         'Referer':baseurl,
@@ -724,12 +730,13 @@ def playReplayTV(prog_id,c):
         addon.setSetting('x_str_tkn_start',str(int(time.time())))
         resp=resp.json()
         url_mpd=resp['url'] #http://wp1-pod2-replay-vxtoken-pl-prod.prod.cdn.dmdsdp.com/sdash/LIVE$BBC_HD/index.mpd/Manifest?device=BR-AVC-DASH&start=2022-06-13T11%3A33%3A00Z&end=2022-06-13T12%3A30%3A00Z
+        #https://wp-pod1-replay-vxtoken-sk-prod.prod.cdn.dmdsdp.com/sdash/LIVE$10004/index.mpd/Manifest?device=AVC-OTT-DASH-PR-WV&start=2024-03-10T04%3A29%3A00Z&end=2024-03-10T05%3A15%3A00Z
         drmContentId=resp['drmContentId']
 
         vxttoken=addon.getSetting('x_streaming_token')
         url_mpd_tkn=url_mpd.replace('sdash','sdash;vxttoken='+vxttoken)
 
-        url_lic='https://prod.spark.upctv.pl/pol/web/session-manager/license?ContentId='+drmContentId
+        url_lic='https://spark-prod-sk.gnp.cloud.upctv.sk/slk/web/session-manager/license?ContentId='+drmContentId
         hea_lic={
             'User-Agent':UA,
             'Referer':baseurl,
@@ -790,7 +797,7 @@ def entitlementsToken():#
     x_profile=addon.getSetting('x_profile')
 
     #pakiety
-    url='https://prod.spark.upctv.pl/pol/web/purchase-service/v2/customers/'+x_cus+'/entitlements'
+    url='https://spark-prod-sk.gnp.cloud.upctv.sk/slk/web/purchase-service/v2/customers/'+x_cus+'/entitlements'
     hea={
         'User-Agent':UA,
         'Referer':baseurl,
@@ -807,7 +814,7 @@ def entitlementsToken():#
 
 def vod_categ(): #Główne menu VOD -> MY Prime, Seriale, Odkrywaj, Dla dzieci, Kanały na Żądanie
     entitlementsToken()
-    url='https://prod.spark.upctv.pl/pol/web/vod-service/v2/vodstructure/omw_hzn4_vod?language=pl&fallbackRootId=omw_hzn4_vod&maxRes=HD&excludeAdult=true&filterOnDemand=svod&featureFlags=client_Mobile'
+    url='https://spark-prod-sk.gnp.cloud.upctv.sk/slk/web/vod-service/v2/vodstructure/omw_hzn4_vod?language=pl&fallbackRootId=omw_hzn4_vod&maxRes=HD&excludeAdult=true&filterOnDemand=svod&featureFlags=client_Mobile'
     hea={
         'User-Agent':UA,
         'Referer':baseurl,
@@ -821,6 +828,7 @@ def vod_categ(): #Główne menu VOD -> MY Prime, Seriale, Odkrywaj, Dla dzieci, 
         'ACCESSTOKEN':accessToken_refresh()#addon.getSetting('accessToken')
     }
     resp=requests.get(url,headers=hea,cookies=cookies).json()
+    print(resp)
     for r in resp['screens']:
         title=r['title']
         contId=r['id']
@@ -835,7 +843,7 @@ def vod_categ(): #Główne menu VOD -> MY Prime, Seriale, Odkrywaj, Dla dzieci, 
 def vod_subcateg(contId): #Podkategorie VOD
     x_profile=addon.getSetting('x_profile')
     cityId=addon.getSetting('cityId')
-    url='https://prod.spark.upctv.pl/pol/web/vod-service/v2/vodscreen/omw_hzn4_vod~pl/'+contId+'?language=pl&profileId='+x_profile+'&optIn=false&sharedProfile=true&maxRes=4K&cityId='+cityId+'&includeExternalProvider=ALL&excludeAdult=true&featureFlags=client_Mobile'
+    url='https://spark-prod-sk.gnp.cloud.upctv.sk/slk/web/vod-service/v2/vodscreen/omw_hzn4_vod~pl/'+contId+'?language=pl&profileId='+x_profile+'&optIn=false&sharedProfile=true&maxRes=4K&cityId='+cityId+'&includeExternalProvider=ALL&excludeAdult=true&featureFlags=client_Mobile'
     hea={
         'User-Agent':UA,
         'Referer':baseurl,
@@ -877,7 +885,7 @@ def getPic(x,y):# y="posterTile"/"episodeStill"
                     cid=x['id']
                 jbody.append({"id":cid,"intents":[y]})
         #print(jbody[0])
-        u='https://staticqbr-pl-prod.prod.cdn.dmdsdp.com/image-service/intent'
+        u='https://staticqbr-prod-sk.gnp.cloud.upctv.sk//image-service/intent'
         params={
             'jsonBody':json.dumps(jbody)
         }
@@ -891,7 +899,7 @@ def vod_items(contId,p):#lista Seriale/Filmy
     x_profile=addon.getSetting('x_profile')
     cityId=addon.getSetting('cityId')
     sorttype='popularity' # TODO wybór w settingsach
-    url='https://prod.spark.upctv.pl/pol/web/vod-service/v2/gridscreen/omw_hzn4_vod~pl/'+contId+'?language=pl&profileId='+x_profile+'&sortType='+sorttype+'&sortDirection=descending&pagingOffset='+p+'&maxRes=4K&cityId='+cityId+'&includeExternalProvider=omw_hzn4_vod&goDownloadable=false&onlyGoPlayable=true&excludeAdult=true'
+    url='https://spark-prod-sk.gnp.cloud.upctv.sk/slk/web/vod-service/v2/gridscreen/omw_hzn4_vod~pl/'+contId+'?language=pl&profileId='+x_profile+'&sortType='+sorttype+'&sortDirection=descending&pagingOffset='+p+'&maxRes=4K&cityId='+cityId+'&includeExternalProvider=omw_hzn4_vod&goDownloadable=false&onlyGoPlayable=true&excludeAdult=true'
     hea={
         'User-Agent':UA,
         'Referer':baseurl,
@@ -970,7 +978,7 @@ def vod_items(contId,p):#lista Seriale/Filmy
 def vodDet(contId,prov):#2022-12-23
     x_profile=addon.getSetting('x_profile')
     cityId=addon.getSetting('cityId')
-    url='https://prod.spark.upctv.pl/pol/web/vod-service/v2/detailscreen/'+contId+'?language=pl&profileId='+x_profile+'&maxRes=4K&cityId='+cityId+'&includeExternalProvider=ALL&brandingProviderId='+prov
+    url='https://spark-prod-sk.gnp.cloud.upctv.sk/slk/web/vod-service/v2/detailscreen/'+contId+'?language=pl&profileId='+x_profile+'&maxRes=4K&cityId='+cityId+'&includeExternalProvider=ALL&brandingProviderId='+prov
     hea={
         'User-Agent':UA,
         'Referer':baseurl,
@@ -1042,7 +1050,7 @@ def vod_film(contId,prov): #szczegóły filmu/odcinka serialu ---> odtwarzanie
 def vod_serial(contId): #lista sezonów
     x_profile=addon.getSetting('x_profile')
     cityId=addon.getSetting('cityId')
-    url='https://prod.spark.upctv.pl/pol/web/picker-service/v2/episodePicker?profileId='+x_profile+'&seriesCrid='+contId+'&country=pl&language=pl&maxRes=4K&cityId='+cityId+'&replayOptedInTime=0&includeExternalProvider=ALL&mergingOn=true'
+    url='https://spark-prod-sk.gnp.cloud.upctv.sk/slk/web/picker-service/v2/episodePicker?profileId='+x_profile+'&seriesCrid='+contId+'&country=pl&language=pl&maxRes=4K&cityId='+cityId+'&replayOptedInTime=0&includeExternalProvider=ALL&mergingOn=true'
     hea={
         'User-Agent':UA,
         'Referer':baseurl,
@@ -1077,7 +1085,7 @@ def vod_serial(contId): #lista sezonów
 def vod_episodes(contId,s): #lista odcinków danego sezonu
     x_profile=addon.getSetting('x_profile')
     cityId=addon.getSetting('cityId')
-    url='https://prod.spark.upctv.pl/pol/web/picker-service/v2/episodePicker?profileId='+x_profile+'&seriesCrid='+contId+'&country=pl&language=pl&maxRes=4K&cityId='+cityId+'&replayOptedInTime=0&includeExternalProvider=ALL&mergingOn=true'
+    url='https://spark-prod-sk.gnp.cloud.upctv.sk/slk/web/picker-service/v2/episodePicker?profileId='+x_profile+'&seriesCrid='+contId+'&country=pl&language=pl&maxRes=4K&cityId='+cityId+'&replayOptedInTime=0&includeExternalProvider=ALL&mergingOn=true'
     hea={
         'User-Agent':UA,
         'Referer':baseurl,
@@ -1176,7 +1184,7 @@ def search_vod(q):
     entitlementsToken()
     x_profile=addon.getSetting('x_profile')
     cityId=addon.getSetting('cityId')
-    url='https://prod.spark.upctv.pl/pol/web/discovery-service/v3/search/contents?profileId='+x_profile+'&sharedProfile=true&includeDetails=true&replayOptedInTime=0&cityId='+cityId+'&clientType=209&contentSourceId=1&contentSourceId=2&contentSourceId=3&contentSourceId=101&contentSourceId=102&searchTerm='+query+'&queryLanguage=pl&startResults=0&maxResults=100&includeNotEntitled=true&maxRes=4K&mergingOn=true&includeExternalProvider=ALL'
+    url='https://spark-prod-sk.gnp.cloud.upctv.sk/slk/web/discovery-service/v3/search/contents?profileId='+x_profile+'&sharedProfile=true&includeDetails=true&replayOptedInTime=0&cityId='+cityId+'&clientType=209&contentSourceId=1&contentSourceId=2&contentSourceId=3&contentSourceId=101&contentSourceId=102&searchTerm='+query+'&queryLanguage=pl&startResults=0&maxResults=100&includeNotEntitled=true&maxRes=4K&mergingOn=true&includeExternalProvider=ALL'
     hea={
         'User-Agent':UA,
         'Referer':baseurl,
@@ -1270,7 +1278,8 @@ def search_replayTV(q):
     entitlementsToken()
     x_profile=addon.getSetting('x_profile')
     cityId=addon.getSetting('cityId')
-    url='https://prod.spark.upctv.pl/pol/web/discovery-service/v3/search/contents?profileId='+x_profile+'&sharedProfile=true&includeDetails=true&replayOptedInTime=0&cityId='+cityId+'&clientType=209&contentSourceId=1&contentSourceId=2&contentSourceId=3&contentSourceId=101&contentSourceId=102&searchTerm='+query+'&queryLanguage=pl&startResults=0&maxResults=100&includeNotEntitled=true&filterTimeWindowStart='+str(ts)+'&filterTimeWindowEnd='+str(te)+'&maxRes=4K&mergingOn=true&includeExternalProvider=ALL'
+    #url='https://spark-prod-sk.gnp.cloud.upctv.sk/slk/web/discovery-service/v3/search/contents?profileId='+x_profile+'&sharedProfile=true&includeDetails=true&replayOptedInTime=0&cityId='+cityId+'&clientType=209&contentSourceId=1&contentSourceId=2&contentSourceId=3&contentSourceId=101&contentSourceId=102&searchTerm='+query+'&queryLanguage=pl&startResults=0&maxResults=100&includeNotEntitled=true&filterTimeWindowStart='+str(ts)+'&filterTimeWindowEnd='+str(te)+'&maxRes=4K&mergingOn=true&includeExternalProvider=ALL'
+    url='https://spark-prod-sk.gnp.cloud.upctv.sk/slk/web/discovery-service/v3/search/contents?profileId='+x_profile+'&sharedProfile=true&includeDetails=true&replayOptedInTime=0&cityId='+cityId+'&clientType=209&contentSourceId=1&contentSourceId=2&contentSourceId=3&contentSourceId=101&contentSourceId=102&searchTerm='+query+'&queryLanguage=sk&startResults=0&maxResults=100&includeNotEntitled=true&filterTimeWindowStart='+str(ts)+'&filterTimeWindowEnd='+str(te)+'&maxRes=HD&mergingOn=true&goPlayableOnly=true&filterOnDemand=svod'
     hea={
         'User-Agent':UA,
         'Referer':baseurl,
@@ -1282,7 +1291,8 @@ def search_replayTV(q):
     cookies={
         'ACCESSTOKEN':accessToken_refresh()#addon.getSetting('accessToken')
     }
-    resp=requests.get(url,headers=hea,cookies=cookies).json()
+    fresp=requests.get(url,headers=hea,cookies=cookies)
+    resp=fresp.json()
     for r in resp['results']:
         if 'seriesContentType' in r:
             if r['seriesContentType']=='Linear':
@@ -1410,7 +1420,7 @@ def seaRes_serial(contId,chans):
     for c in chns:
         if chanCheck(channels,c):
 
-            url='https://prod.spark.upctv.pl/pol/web/picker-service/v2/episodePicker?profileId='+x_profile+'&seriesCrid='+contId+'&country=pl&language=pl&maxRes=4K&cityId='+cityId+'&replayOptedInTime=0&channelId='+c+'&includeExternalProvider=ALL&mergingOn=true'
+            url='https://spark-prod-sk.gnp.cloud.upctv.sk/slk/web/picker-service/v2/episodePicker?profileId='+x_profile+'&seriesCrid='+contId+'&country=pl&language=pl&maxRes=4K&cityId='+cityId+'&replayOptedInTime=0&channelId='+c+'&includeExternalProvider=ALL&mergingOn=true'
             hea={
                 'User-Agent':UA,
                 'Referer':baseurl,
@@ -1506,7 +1516,7 @@ def seaRes_serial(contId,chans):
 def seaRes_film(contId,tit):
     x_profile=addon.getSetting('x_profile')
     cityId=addon.getSetting('cityId')
-    url='https://prod.spark.upctv.pl/pol/web/picker-service/v1/titleAlsoAvailableOn?profileId='+x_profile+'&language=pl&country=pl&titleId='+contId+'&maxRes=4K&cityId='+cityId+'&includeExternalProvider=ALL&mergingOn=true'
+    url='https://spark-prod-sk.gnp.cloud.upctv.sk/slk/web/picker-service/v1/titleAlsoAvailableOn?profileId='+x_profile+'&language=pl&country=pl&titleId='+contId+'&maxRes=4K&cityId='+cityId+'&includeExternalProvider=ALL&mergingOn=true'
     hea={
         'User-Agent':UA,
         'Referer':baseurl,
@@ -1581,7 +1591,7 @@ def radio():#2022-12-28
 
     #lista kanałów
     cityId=addon.getSetting('cityId')
-    url='https://prod.spark.upctv.pl/pol/web/linear-service/v2/channels?cityId='+cityId+'&language=pl&productClass=Orion-DASH'
+    url='https://spark-prod-sk.gnp.cloud.upctv.sk/slk/web/linear-service/v2/channels?cityId='+cityId+'&language=pl&productClass=Orion-DASH'
     hea={
         'User-Agent':UA,
         'Referer':baseurl,
@@ -1658,7 +1668,7 @@ def logOut():
         'X-Profile':addon.getSetting('x_profile'),
         'X-Refresh-Token':addon.getSetting('x_refresh_token')
     }
-    url='https://prod.spark.upctv.pl/auth-service/v1/authorization'
+    url='https://spark-prod-sk.gnp.cloud.upctv.sk/auth-service/v1/authorization'
     resp=requests.delete(url,headers=hea)
 
     addon.setSetting('status','loggedOut')

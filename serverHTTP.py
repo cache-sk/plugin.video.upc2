@@ -13,7 +13,7 @@ addon = xbmcaddon.Addon(id='plugin.video.upc2')
 import requests
 import sys
 
-baseurl='https://www.upctv.pl/'
+baseurl='https://www.upctv.sk/'
 UA='Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:101.0) Gecko/20100101 Firefox/101.0'
 
 def accessToken_refresh(): #POWIELENIE z addon.py
@@ -28,7 +28,7 @@ def accessToken_refresh(): #POWIELENIE z addon.py
     cookies={
         'ACCESSTOKEN':addon.getSetting('accessToken')
     }
-    url='https://prod.spark.upctv.pl/auth-service/v1/authorization/refresh'
+    url='https://spark-prod-sk.gnp.cloud.upctv.sk/auth-service/v1/authorization/refresh'
     resp=requests.post(url,headers=hea,cookies=cookies,json=data).json()
     addon.setSetting('accessToken',resp['accessToken'])
     addon.setSetting('x_refresh_token',resp['refreshToken'])
@@ -36,7 +36,7 @@ def accessToken_refresh(): #POWIELENIE z addon.py
     return resp['accessToken']
 
 def refreshStreamingToken():#liveTV
-    url='https://prod.spark.upctv.pl/pol/web/session-manager/license/token'
+    url='https://spark-prod-sk.gnp.cloud.upctv.sk/slk/web/session-manager/license/token'
     hea={
         'User-Agent':UA,
         'Referer':baseurl,
@@ -60,7 +60,7 @@ def refreshStreamingTokenReplay():#replayTV
     now=int(time.time())
     start=int(addon.getSetting('startPlaying'))
     position=now-start
-    url='https://prod.spark.upctv.pl/pol/web/session-manager/license/token?position='+str(position)
+    url='https://spark-prod-sk.gnp.cloud.upctv.sk/slk/web/session-manager/license/token?position='+str(position)
     hea={
         'User-Agent':UA,
         'Referer':baseurl,
